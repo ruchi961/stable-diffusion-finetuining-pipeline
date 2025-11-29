@@ -1,39 +1,41 @@
 # * stable-diffusion-finetuining-pipeline
 
-## * Journey and what I have tried:
+## * Journey of learning understanding and implementing, also what I have tried:
 
-Stable diffusion was new for me as I have base idea of what it does etc, but in order to optimize it I wanted to dig deep into the network architecture how it is loaded and what can be doen to make it more optimized to finetuin on. The jorunery started with exploring the architecture of stable diffusion, once I did then I proceeded with finding how it can be optimized I researched about it and came accross solutions like dreembooth and diffusers. I even tried diffusers to see is it really optimized and can it run on the infra requirements we have. Even though I did that I wante dto try how optimization can be done from scratch , just like we think layer by layer to really load the model in the gpu infrastructure, The basic idea that came to my ida when optimizing the network was lora, qlora, and knowledge distillation knid of techniques, to understand more of how this basic techniques can be extended I went through some research papers like , where I could laso extend my work to adapt to these tehcniques, but I started with lora the best to train on low VRAM budget 
-when I started with lora as i understood the netwrook meaning how each layer of sdxl contributes to its learning like for instance i understood its layers like this 
+Stable diffusion was new for me as I have base idea of what it does etc, but in order to optimize it I wanted to dig deep into the network architecture how it is loaded and what can be doen to make it more optimized to finetune on. The jorunery started with exploring the architecture of stable diffusion, once I did then I proceeded with finding how it can be optimized I researched about it and came accross solutions like dreambooth and diffusers and some research papers like dora,etc. I even tried diffusers to see is it really optimized and can it run on the infra requirements we have. 
+I wanted to try how optimization can be done from scratch , just like we think layer by layer to really load the model in the gpu infrastructure, The basic idea that came to my mind when I read the doc was  lora, qlora, and knowledge distillation kind of techniques.
+So, I created and tried step by step optimizations for each layer and what kind of results do they provide. So I started implementing lora with the network, since the network structure is different lora implemetation also  should target proper layer and network. 
 
-1. VAE (Variational Autoencoder):
+From basics I first understood  how each layer of sdxl contributes to its learning like for instance i understood its layers like this 
+
+1. **VAE (Variational Autoencoder):**
 does the job of compressing and decompressing the images,
 Compress:  full image and squish it into a smaller, simpler representation called latents.
 Decompress: Later, take those latents and turn them back into a full image.
-3. Text Encoders (CLIPTextModel / CLIPTextModelWithProjection): helps in understanding the texxt captions what it really means 
+
+2. **Text Encoders (CLIPTextModel / CLIPTextModelWithProjection):**
+   helps in understanding the texxt captions what it really means 
 CLIPTextModel → “Just understands the text.”
 CLIPTextModelWithProjection → “Understands the text and translates it into a form the image generator (UNet) can directly use.”
 
-4. UNet (with LoRA): Does the job of denoise, meaning a randomly noised image in laten space is given ,denoise it iterately to produce somehing that maks sense effectively generating the final image, 90% job happending here.
+4. **UNet (with LoRA):** Does the job of denoise, meaning a randomly noised image in laten space is given ,denoise it iterately to produce somehing that maks sense effectively generating the final image, 90% job happending here.
 
-5. Noise Scheduler (DDPMScheduler): Adds and removes the noise for diffusion-based training, meaning it says how much noise to add at each timestep, so the UNet can learn to denoise effectively.
+5. **Noise Scheduler (DDPMScheduler):** Adds and removes the noise for diffusion-based training, meaning it says how much noise to add at each timestep, so the UNet can learn to denoise effectively.
 
 
-Once I learned, I also learned unet is the one that needs lora adapter since it does the job of real learning, i.e denoise andpredict and learn, and the text encoder also is responsible for learning the style from text because it understands text anddoes the representation f text to to image understaing 
+Once I was done with that, I understood unet is the one that needs lora adapter since it does the job of real learning, i.e denoise and predict and learn, and the text encoder also is responsible for learning the style from text because it understands text with text embeddings etc, does the representation of text for image understaing 
 
-So Since I wanted to see how this layers qlora affect in training I went ahead with experiments 
-one with qlora on unet and text encoder one on unet only etc 
-The experiement I tried are below, bu this was my overall idea 
+So Since I wanted to see how this layers could affect lora in training I went ahead with experiments as follows:
+
+1. First I tried normal pipeline load the networks unet text encoder etc in sub folders of hf or the network basically and put up lora config but here when i tried i was getting nan as my loss reason was vae latent represnetation misatkes in fp16 loading and timesteps which i set initially to zero they were not actually relating the image latent and ocntributing to learning, hence made the modifications for timesteps and vae. so loaded the vae in fp32 did latent operation and converted in fp 16 instead of using vae in 16fp like in dreambotth (i.e community given vae)
+2. next the losses were good but I though we could also change the lora adapters for different network like convulation which are essential for unet or cross attnetion importanc=t aspect of unet, so I decided to test out in experiements and find out in inference how the models were getting affected and whther they learnt good or no.
+3. Next, I also wanted to try if text encoder as well can help in proper understanding of styles in caption.
+4. next i tried their combinations to compare which models are good
+5. I came tot hte conclusion that unet with self attention lora performs better so I tried sparse dropout to see in some overfitting kindof aspect can be ocntroleed so tried  spare dropout 
+6. Next I wanted to experiment with the dora technique since the technique is much better than plain lora and also assists in resource efficient training, so tried weight decomposiiton dora. 
+
+In short my attempt was to ,
 Learn he network architetcure find where the problem lies, how can you optimize, experiment and try how you can do and compare the results.
-
-First I tried with vae but since vae fp32 fp16 if not loaded properly gives nan loss as well the computation in timesteps must be properly , in the first attempt as I kept it 0 timesteps and loaded vae directly in fp16 the loses were nan.
-so the n iloaded the vae in fp32 did latent operation and converted in fp 32 instaed of using vae in 16fp like in dreembotth
-next i corrected the timesteps properly 
-next I tried with unet layers for lora only the self attention one 
-next i tried if these more layers like convulation or cross attn can help in training the model better so tried that
-next i tried if text encoder as well can help in proper understanding of stylke in caption
-next i tried their combinations to compare
-next i tried spare dropout 
-next i tired dora 
 
 # Files and folders descriptions:
 ## 1. Experiments folder 
@@ -76,6 +78,7 @@ have shared only lora as other were on kaggle and didnt let to download i used u
   
  ### a. text_encoder_yes_unet_many_layers.ipynb 
    #### Detailed High Level overview:
+   In this approach what i essentially wanted to load encoder in fp16 vae in fp32 but latent calulation in fp16 for better optimization in term of model loading precision,h ence model could be loaded properly ,Next have lora dapater on text encoder as well as on unet layers, perform vae slicing tiling, perform gradient checkpointing, have noise offset, perform random cropping, dropout and gradientaccumulation these wer all loading, models, memory and trainign optimization, I have explain why each down.
    ### Tecnhiques used:
    
   a. Float16 UNet and text encoders
@@ -107,7 +110,7 @@ have shared only lora as other were on kaggle and didnt let to download i used u
 
 ### **a. Float16 UNet and Text Encoders**
 
-* less prciison 16 than 32 and helps SDXL to fit comfortably within 16GB VRAM, precision lessening helps in VRAM usage reduction
+* less precison 16 than 32 and helps SDXL to fit comfortably within 16GB VRAM, precision lessening helps in VRAM usage reduction
 
 ### **b. Float32 VAE for Stability (with FP16 Latents)**
 
@@ -130,7 +133,7 @@ have shared only lora as other were on kaggle and didnt let to download i used u
 ### **f. Noise Offset**
 
 * Stabilizes training by smoothing extreme noise values.
-* Reduces risks of NaNs or unstable gradients on low VRAM.
+* Essentially to reduce the  risks of NaNs or unstable gradients 
 
 ### **g. Random Cropping**
 
@@ -160,6 +163,7 @@ have shared only lora as other were on kaggle and didnt let to download i used u
   ### b. text_encoder_yes_unet_single_layer.ipynb
     Here both the text encoder are having lora loaded in quantized manner and the layers of unet are jus the attention layers 
    #### Detailed High Level overview:
+   same as above but single unet layer lora
    ### Tecnhiques used:
   a. Float16 UNet and text encoders
 
@@ -246,11 +250,55 @@ have shared only lora as other were on kaggle and didnt let to download i used u
 
   <hr/>
 
-  
-   ### d. text_encoder_no_unet_single_layer.ipynb
-    Here both the text encoder are **not** having lora loaded in quantized manner and the layers of unet are simple just the attention layers 
+    ### c. text_encoder_no_unet_single_layers.ipynb
+    Here both the text encoder are **not** having lora loaded in quantized manner and the layers of unet are single 
    #### Detailed High Level overview:
-  same as above only single unet layer of self attention no other encoder layers for training 
+  Same as above only text encoder not training and unet with sinle layer 
+   ### Tecnhiques used:
+
+   
+   a. Float16 UNet and text encoders
+
+   
+  b. Float32 VAE for stability -> later conversion in latent space for 16bit and back to 32 bit vae this was done because vae 16bit loaded produces nan errors 
+
+  
+  c. LoRA unet many layers
+
+  
+  d. Gradient checkpointing
+
+  
+  e. VAE slicing and tiling
+
+  
+  f. Noise offset
+
+  
+  g. Random cropping for more training variety
+
+  
+  h. 0.0 dropout through LoRA dropout
+
+  
+  i. Gradient accumulation to simulate larger batch size
+
+  
+   #### How it helps for Resource-Efficient Model Training such as 16 GB VRAM:
+  Same as above text encoder no lora only on unet but single layers more efficient 
+   #### Origin of idea (Motivation/Though Process):
+  Same as above, based on conclucsion to see if single unet layers can give better result with text  encoder freezed completely
+   #### Result after trying:
+  much better than other techniques , unet self attention with out text encoders learn nicely without overhead of text encoders
+   #### Why less better/more better (possible reason):
+   may be because text encoders need more varied captions to learn character real in anime style, rest good for only anime chacretecers with unet single layer, but unet single layer performs good on chacretr real anime an normal anime because maybe those self attention layers need to be trained poeprly i.e lora on them to understand where to focus exactly when image generation i,.e. learn a style in represnetaion 
+
+  <hr/>
+
+   ### e. dora.ipynb
+   to try out if dora version of lora is much better than plain lora
+   #### Detailed High Level overview:
+  Uses dora weight decomposition instead of lora and rest almost same with prodigy optimizers
    ### Tecnhiques used:
 
 
