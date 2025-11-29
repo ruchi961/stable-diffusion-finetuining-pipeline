@@ -324,7 +324,7 @@ have shared only lora as other were on kaggle and didnt let to download i used u
 * Gaussian-initialized LoRA/DoRA weights
 
 
-### **How Each Technique Helps With Resource-Efficient Training**
+### How Each Technique Helps With Resource-Efficient Training
 
 * **Prodigy optimizer** – Adapts learning automatically, reducing wasted steps and compute.
 * **DoRA weight decomposition** – Trains fewer parameters with higher stability and lower memory use.
