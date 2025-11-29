@@ -60,6 +60,8 @@ Contains the performed experiments with the model training and the inference in 
 
 
 # Links as follows:
+https://drive.google.com/drive/folders/1Ie4T_3APD8ALwhKbXn9FDZh5Zi0m5huZ?usp=sharing
+have shared only lora as other were on kaggle and didnt let to download i used up google colab resources  2 3 accounts so kaggle 
 
 # Screenshot:
 <img width="1322" height="749" alt="image" src="https://github.com/user-attachments/assets/2103b61d-d996-4c3d-99ee-a4ec0532cff2" />
